@@ -1,0 +1,10 @@
+{
+  "type":"record",
+  "name":"UserRegistered",
+  "namespace":"HttpToKafka.Contracts",
+  "fields":[
+    {"name":"userId","type":"string"},
+    {"name":"email","type":"string"},
+    {"name":"createdAt","type":"long","logicalType":"timestamp-millis"}
+  ]
+}

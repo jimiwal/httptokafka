@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>HttpToKafka.AppHost</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting" Version="8.0.0-preview.8.24521.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HttpToKafka.Api\HttpToKafka.Api.csproj" />
+  </ItemGroup>
+</Project>

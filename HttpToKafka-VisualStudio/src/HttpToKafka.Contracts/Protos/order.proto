@@ -1,0 +1,8 @@
+syntax = "proto3";
+option csharp_namespace = "HttpToKafka.Contracts";
+
+message OrderCreatedProto {
+  string orderId = 1;
+  double amount = 2;
+  string currency = 3;
+}

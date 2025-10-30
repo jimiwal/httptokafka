@@ -1,0 +1,39 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.9.34728.123
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HttpToKafka.Api", "src\HttpToKafka.Api\HttpToKafka.Api.csproj", "{E618369E-EB30-4C3F-BC90-5C3E42AD6889}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HttpToKafka.Contracts", "src\HttpToKafka.Contracts\HttpToKafka.Contracts.csproj", "{AADF938A-F8A6-42D1-A3E0-7AFCEE5FEA8C}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HttpToKafka.Tests", "tests\HttpToKafka.Tests\HttpToKafka.Tests.csproj", "{0E2E82B5-3458-482A-B15C-728BBF79A8B4}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HttpToKafka.AppHost", "src\HttpToKafka.AppHost\HttpToKafka.AppHost.csproj", "{E0B31522-D1F6-48D2-8550-83D979980FA5}"
+EndProject
+Global
+    GlobalSection(SolutionConfigurationPlatforms) = preSolution
+        Debug|Any CPU = Debug|Any CPU
+        Release|Any CPU = Release|Any CPU
+    EndGlobalSection
+    GlobalSection(ProjectConfigurationPlatforms) = postSolution
+        {E618369E-EB30-4C3F-BC90-5C3E42AD6889}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {E618369E-EB30-4C3F-BC90-5C3E42AD6889}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {E618369E-EB30-4C3F-BC90-5C3E42AD6889}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {E618369E-EB30-4C3F-BC90-5C3E42AD6889}.Release|Any CPU.Build.0 = Release|Any CPU
+        {AADF938A-F8A6-42D1-A3E0-7AFCEE5FEA8C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {AADF938A-F8A6-42D1-A3E0-7AFCEE5FEA8C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {AADF938A-F8A6-42D1-A3E0-7AFCEE5FEA8C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {AADF938A-F8A6-42D1-A3E0-7AFCEE5FEA8C}.Release|Any CPU.Build.0 = Release|Any CPU
+        {0E2E82B5-3458-482A-B15C-728BBF79A8B4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {0E2E82B5-3458-482A-B15C-728BBF79A8B4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {0E2E82B5-3458-482A-B15C-728BBF79A8B4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {0E2E82B5-3458-482A-B15C-728BBF79A8B4}.Release|Any CPU.Build.0 = Release|Any CPU
+        {E0B31522-D1F6-48D2-8550-83D979980FA5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {E0B31522-D1F6-48D2-8550-83D979980FA5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {E0B31522-D1F6-48D2-8550-83D979980FA5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {E0B31522-D1F6-48D2-8550-83D979980FA5}.Release|Any CPU.Build.0 = Release|Any CPU
+    EndGlobalSection
+    GlobalSection(SolutionProperties) = preSolution
+        HideSolutionNode = FALSE
+    EndGlobalSection
+EndGlobal

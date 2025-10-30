@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OrderCreatedJson",
+  "type": "object",
+  "properties": {
+    "orderId": { "type": "string" },
+    "amount": { "type": "number" },
+    "currency": { "type": "string" }
+  },
+  "required": ["orderId", "amount", "currency"]
+}

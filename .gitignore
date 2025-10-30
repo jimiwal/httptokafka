@@ -1,0 +1,19 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/HttpToKafka/HttpToKafka/.vs
+/.vs
+/HttpToKafka-VisualStudio/tests/HttpToKafka.Tests/obj
+/HttpToKafka.SOLID/HttpToKafka.SOLID/.vs/HttpToKafka/v17
+/HttpToKafka.SOLID/HttpToKafka.SOLID/src/HttpToKafka.Api/obj
+/HttpToKafka.SOLID/HttpToKafka.SOLID/src/HttpToKafka.Core/obj
+/HttpToKafka.SOLID/HttpToKafka.SOLID/src/HttpToKafka.Kafka/obj
+/HttpToKafka.SOLID/HttpToKafka.SOLID/tests/HttpToKafka.Tests/obj
+/HttpToKafka.SOLID+Aspire/HttpToKafka.SOLID/.vs/HttpToKafka
+/HttpToKafka.SOLID+Aspire/HttpToKafka.SOLID/src/HttpToKafka.Api/obj
+/HttpToKafka.SOLID+Aspire/HttpToKafka.SOLID/src/HttpToKafka.Aspire.AppHost/obj
+/HttpToKafka.SOLID+Aspire/HttpToKafka.SOLID/src/HttpToKafka.Core/obj
+/HttpToKafka.SOLID+Aspire/HttpToKafka.SOLID/src/HttpToKafka.Kafka/obj
+/HttpToKafka.SOLID+Aspire/HttpToKafka.SOLID/tests/HttpToKafka.IntegrationTests.Aspire/obj
+/HttpToKafka.SOLID+Aspire/HttpToKafka.SOLID/tests/HttpToKafka.Tests/obj
