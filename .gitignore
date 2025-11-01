@@ -17,3 +17,9 @@
 /HttpToKafka.SOLID+Aspire/HttpToKafka.SOLID/src/HttpToKafka.Kafka/obj
 /HttpToKafka.SOLID+Aspire/HttpToKafka.SOLID/tests/HttpToKafka.IntegrationTests.Aspire/obj
 /HttpToKafka.SOLID+Aspire/HttpToKafka.SOLID/tests/HttpToKafka.Tests/obj
+/new solution/KafkaOverHttpClient/.vs/KafkaOverHttpClient
+/new solution/KafkaOverHttpClient/bin/Debug/net8.0
+/new solution/KafkaOverHttpClient/obj
+/new solution/KafkaOverHttp_fixed2/.vs
+/new solution/KafkaOverHttp_fixed2/src/KafkaOverHttp/obj
+/new solution/KafkaOverHttp_fixed2/src/KafkaOverHttp/bin/Debug/net8.0
