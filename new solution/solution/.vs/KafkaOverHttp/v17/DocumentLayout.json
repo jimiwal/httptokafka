@@ -1,0 +1,109 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\rober\\Downloads\\KafkaOverHttp_fixed2\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{2A59CF75-2B59-4A2E-9E1C-1D4B5F6D12AA}|src\\KafkaOverHttp\\KafkaOverHttp.csproj|c:\\users\\rober\\downloads\\kafkaoverhttp_fixed2\\src\\kafkaoverhttp\\services\\subscriptionmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{2A59CF75-2B59-4A2E-9E1C-1D4B5F6D12AA}|src\\KafkaOverHttp\\KafkaOverHttp.csproj|solutionrelative:src\\kafkaoverhttp\\services\\subscriptionmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{2A59CF75-2B59-4A2E-9E1C-1D4B5F6D12AA}|src\\KafkaOverHttp\\KafkaOverHttp.csproj|c:\\users\\rober\\downloads\\kafkaoverhttp_fixed2\\src\\kafkaoverhttp\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{2A59CF75-2B59-4A2E-9E1C-1D4B5F6D12AA}|src\\KafkaOverHttp\\KafkaOverHttp.csproj|solutionrelative:src\\kafkaoverhttp\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{2A59CF75-2B59-4A2E-9E1C-1D4B5F6D12AA}|src\\KafkaOverHttp\\KafkaOverHttp.csproj|c:\\users\\rober\\downloads\\kafkaoverhttp_fixed2\\src\\kafkaoverhttp\\services\\kafkaproducerservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{2A59CF75-2B59-4A2E-9E1C-1D4B5F6D12AA}|src\\KafkaOverHttp\\KafkaOverHttp.csproj|solutionrelative:src\\kafkaoverhttp\\services\\kafkaproducerservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 11,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:133:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:134:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:131:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:130:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:131:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:129:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:129:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:132:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{cce594b6-0c39-4442-ba28-10c64ac7e89f}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\rober\\Downloads\\KafkaOverHttp_fixed2\\src\\KafkaOverHttp\\Program.cs",
+              "RelativeDocumentMoniker": "src\\KafkaOverHttp\\Program.cs",
+              "ToolTip": "C:\\Users\\rober\\Downloads\\KafkaOverHttp_fixed2\\src\\KafkaOverHttp\\Program.cs",
+              "RelativeToolTip": "src\\KafkaOverHttp\\Program.cs",
+              "ViewState": "AgIAAHAAAAAAAAAAAAAkwIgAAAAEAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-01T13:02:28.804Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "SubscriptionManager.cs",
+              "DocumentMoniker": "C:\\Users\\rober\\Downloads\\KafkaOverHttp_fixed2\\src\\KafkaOverHttp\\Services\\SubscriptionManager.cs",
+              "RelativeDocumentMoniker": "src\\KafkaOverHttp\\Services\\SubscriptionManager.cs",
+              "ToolTip": "C:\\Users\\rober\\Downloads\\KafkaOverHttp_fixed2\\src\\KafkaOverHttp\\Services\\SubscriptionManager.cs",
+              "RelativeToolTip": "src\\KafkaOverHttp\\Services\\SubscriptionManager.cs",
+              "ViewState": "AgIAAAMAAAAAAAAAAAAnwBYAAABAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-01T12:57:53.755Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "KafkaProducerService.cs",
+              "DocumentMoniker": "C:\\Users\\rober\\Downloads\\KafkaOverHttp_fixed2\\src\\KafkaOverHttp\\Services\\KafkaProducerService.cs",
+              "RelativeDocumentMoniker": "src\\KafkaOverHttp\\Services\\KafkaProducerService.cs",
+              "ToolTip": "C:\\Users\\rober\\Downloads\\KafkaOverHttp_fixed2\\src\\KafkaOverHttp\\Services\\KafkaProducerService.cs",
+              "RelativeToolTip": "src\\KafkaOverHttp\\Services\\KafkaProducerService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABYAAAAMAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-01T13:08:03.762Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

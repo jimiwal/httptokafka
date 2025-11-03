@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("HttpToKafka.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+853899a69fa8273fe61c73c589c1e4f3be6244c2")]
 [assembly: System.Reflection.AssemblyProductAttribute("HttpToKafka.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("HttpToKafka.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

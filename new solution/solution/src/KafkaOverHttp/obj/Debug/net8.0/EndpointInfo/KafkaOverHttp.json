@@ -1,0 +1,303 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "KafkaOverHttp",
+    "version": "v1"
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "tags": [
+          "KafkaOverHttp"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/info/topics": {
+      "get": {
+        "tags": [
+          "KafkaOverHttp"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/info/cluster": {
+      "get": {
+        "tags": [
+          "KafkaOverHttp"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/produce/confirmed": {
+      "post": {
+        "tags": [
+          "KafkaOverHttp"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProduceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/produce/fast": {
+      "post": {
+        "tags": [
+          "KafkaOverHttp"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProduceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/consume/one": {
+      "post": {
+        "tags": [
+          "KafkaOverHttp"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsumeOneRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/subscribe/push": {
+      "post": {
+        "tags": [
+          "KafkaOverHttp"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscribePushRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/subscribe/cancel": {
+      "post": {
+        "tags": [
+          "KafkaOverHttp"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelSubscriptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CancelSubscriptionRequest": {
+        "required": [
+          "subscriptionId"
+        ],
+        "type": "object",
+        "properties": {
+          "subscriptionId": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConsumeOneRequest": {
+        "required": [
+          "serialization",
+          "topic"
+        ],
+        "type": "object",
+        "properties": {
+          "topic": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxWaitMs": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32"
+          },
+          "serialization": {
+            "$ref": "#/components/schemas/SerializationKind"
+          },
+          "avroSchema": {
+            "type": "string",
+            "nullable": true
+          },
+          "partition": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProduceRequest": {
+        "required": [
+          "serialization",
+          "topic",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "topic": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "value": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "serialization": {
+            "$ref": "#/components/schemas/SerializationKind"
+          },
+          "avroSchema": {
+            "type": "string",
+            "nullable": true
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "partition": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SerializationKind": {
+        "enum": [
+          0,
+          1
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "SubscribePushRequest": {
+        "required": [
+          "serialization",
+          "subscriptionId",
+          "targetEndpoint",
+          "topic"
+        ],
+        "type": "object",
+        "properties": {
+          "topic": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "targetEndpoint": {
+            "minLength": 1,
+            "type": "string",
+            "format": "uri"
+          },
+          "durationMs": {
+            "maximum": 2147483647,
+            "minimum": 1000,
+            "type": "integer",
+            "format": "int32"
+          },
+          "serialization": {
+            "$ref": "#/components/schemas/SerializationKind"
+          },
+          "avroSchema": {
+            "type": "string",
+            "nullable": true
+          },
+          "pollIntervalMs": {
+            "maximum": 2147483647,
+            "minimum": 50,
+            "type": "integer",
+            "format": "int32"
+          },
+          "subscriptionId": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
