@@ -79,7 +79,7 @@ public sealed class SubscriptionManager : BackgroundService
         {
             try
             {
-                // Zbierz aktualne topiki z aktywnych subskrypcji
+                // Zbierz aktualne topiki z aktywnych subskrypcji a
                 var topics = _subs.Values.Select(s => s.Topic).Distinct().OrderBy(t => t).ToArray();
 
                 // Jeœli lista tematów siê zmieni³a – prze³¹cz subskrypcjê

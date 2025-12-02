@@ -7,7 +7,7 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- Konfiguracja z appsettings ---
+// --- Konfiguracja z appsettings --- ddd
 var kafkaSection = builder.Configuration.GetSection("Kafka");
 
 builder.Services.Configure<ProducerConfig>(options =>
