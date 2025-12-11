@@ -65,19 +65,24 @@ services:
 
 
       # Ścieżka do katalogu
+# Ścieżka do katalogu głównego
 $folder = "C:\Twoj\Katalog"
 
-# Whitelist rozszerzeń (bez kropki lub z kropką – obie formy działają)
+# Whitelist rozszerzeń
 $whitelist = @("xml", "json", "css", "txt")
 
-Get-ChildItem -Path $folder -File | Where-Object {
-    $ext = $_.Extension.TrimStart(".")
-    $whitelist -contains $ext
+Get-ChildItem -Path $folder -File -Recurse | Where-Object {
+    $_.Extension.TrimStart(".") -in $whitelist
 } | ForEach-Object {
-    $content = Get-Content $_.FullName -Raw
-    $singleLine = $content -replace "`r`n|`n|`r", ""
+    
+    $originalContent = Get-Content $_.FullName -Raw
+    $singleLine = $originalContent -replace "`r`n|`n|`r", ""
 
-    Set-Content -Path $_.FullName -Value $singleLine
-    Write-Host "Przetworzono plik: $($_.Name)"
+    # Sprawdzenie, czy coś się zmieniło
+    if ($originalContent -ne $singleLine) {
+        Set-Content -Path $_.FullName -Value $singleLine
+        Write-Host "[ZMIENIONO] $($_.FullName)"
+    }
 }
+
 
