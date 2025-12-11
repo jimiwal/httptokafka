@@ -64,7 +64,6 @@ services:
 
 
 
-      # Ścieżka do katalogu
 # Ścieżka do katalogu głównego
 $folder = "C:\Twoj\Katalog"
 
@@ -76,11 +75,19 @@ Get-ChildItem -Path $folder -File -Recurse | Where-Object {
 } | ForEach-Object {
     
     $originalContent = Get-Content $_.FullName -Raw
-    $singleLine = $originalContent -replace "`r`n|`n|`r", ""
 
-    # Sprawdzenie, czy coś się zmieniło
-    if ($originalContent -ne $singleLine) {
-        Set-Content -Path $_.FullName -Value $singleLine
+    # Usuwanie nowych linii
+    $processed = $originalContent -replace "`r`n|`n|`r", ""
+
+    # Usuwanie tabów
+    $processed = $processed -replace "`t", ""
+
+    # Zamiana wielu spacji na jedną
+    $processed = $processed -replace " {2,}", " "
+
+    # Zmiana tylko jeśli treść różna od oryginału
+    if ($originalContent -ne $processed) {
+        Set-Content -Path $_.FullName -Value $processed
         Write-Host "[ZMIENIONO] $($_.FullName)"
     }
 }
