@@ -58,3 +58,26 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+
+
+
+
+
+
+      # Ścieżka do katalogu
+$folder = "C:\Twoj\Katalog"
+
+# Whitelist rozszerzeń (bez kropki lub z kropką – obie formy działają)
+$whitelist = @("xml", "json", "css", "txt")
+
+Get-ChildItem -Path $folder -File | Where-Object {
+    $ext = $_.Extension.TrimStart(".")
+    $whitelist -contains $ext
+} | ForEach-Object {
+    $content = Get-Content $_.FullName -Raw
+    $singleLine = $content -replace "`r`n|`n|`r", ""
+
+    Set-Content -Path $_.FullName -Value $singleLine
+    Write-Host "Przetworzono plik: $($_.Name)"
+}
+
