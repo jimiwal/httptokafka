@@ -27,6 +27,10 @@ namespace AwsConnectivityVerifier
     /// 3) S3 user test: download one of those objects (first one) and read up to N bytes
     ///
     /// If all operations succeed, returns a detailed JSON status including object names and sizes.
+    ///
+    /// Note:
+    /// - The "connection" section is always included at the top of the JSON and contains:
+    ///   proxy usage + proxy URL (or "not used"), S3Endpoint, and BucketName.
     /// </summary>
     public sealed class AwsConnectivityThroughProxyVerifier
     {
@@ -86,7 +90,7 @@ namespace AwsConnectivityVerifier
             public long S3GetMaxBytesToRead { get; init; } = 2L * 1024 * 1024; // 2 MiB
 
             /// <summary>
-            /// If true, forces path-style addressing for S3, which is commonly required for S3-compatible endpoints.
+            /// If true, forces path-style addressing for S3, commonly required for S3-compatible endpoints.
             /// Example: https://endpoint/bucket/key instead of https://bucket.endpoint/key
             /// </summary>
             public bool ForceS3PathStyle { get; init; } = true;
@@ -120,10 +124,13 @@ namespace AwsConnectivityVerifier
         {
             public bool Ok { get; set; }
 
-            public object Proxy { get; init; }
-            public string EcsEndpointUrl { get; init; }
-            public string S3EndpointUrl { get; init; }
-            public string S3BucketName { get; init; }
+            /// <summary>
+            /// Always present at the top of the JSON:
+            /// - proxy used + proxy URL (or not used)
+            /// - s3Endpoint
+            /// - bucketName
+            /// </summary>
+            public object Connection { get; init; }
 
             public TestResult EcsConnectivity { get; set; }
             public TestResult S3List10Root { get; set; }
@@ -165,17 +172,28 @@ namespace AwsConnectivityVerifier
         {
             var swTotal = Stopwatch.StartNew();
 
+            bool proxyEnabled = _cfg.Proxy?.Enabled == true;
+
+            string proxyUrl = null;
+            if (proxyEnabled)
+            {
+                // Do not leak proxy password in output.
+                if (_cfg.Proxy.HasAuth)
+                    proxyUrl = $"http://{_cfg.Proxy.Username}:*****@{_cfg.Proxy.Host}:{_cfg.Proxy.Port}";
+                else
+                    proxyUrl = $"http://{_cfg.Proxy.Host}:{_cfg.Proxy.Port}";
+            }
+
             var result = new FinalResult
             {
-                EcsEndpointUrl = _cfg.EcsEndpointUrl,
-                S3EndpointUrl = _cfg.S3EndpointUrl,
-                S3BucketName = _cfg.S3BucketName,
-                Proxy = new
+                Connection = new
                 {
-                    enabled = _cfg.Proxy?.Enabled ?? false,
-                    host = _cfg.Proxy?.Host,
-                    port = _cfg.Proxy?.Port,
-                    auth = _cfg.Proxy?.HasAuth ?? false
+                    proxy = proxyEnabled
+                        ? new { enabled = true, url = proxyUrl }
+                        : new { enabled = false, message = "Proxy is not used" },
+
+                    s3Endpoint = _cfg.S3EndpointUrl,
+                    bucketName = _cfg.S3BucketName
                 }
             };
 
@@ -440,13 +458,16 @@ namespace AwsConnectivityVerifier
         private IAmazonS3 CreateS3Client()
         {
             // No regions are set here; we use an explicit endpoint URL.
-            // ForcePathStyle is commonly required for S3-compatible endpoints.
+            // ForcePathStyle is commonly required for S3-compatible endpoints (Dell ECS included).
             var config = new AmazonS3Config
             {
                 ServiceURL = _cfg.S3EndpointUrl,
                 ForcePathStyle = _cfg.ForceS3PathStyle,
                 Timeout = _cfg.PerCallTimeout,
-                UseHttp = _cfg.S3EndpointUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                UseHttp = _cfg.S3EndpointUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase),
+
+                // Commonly required for S3-compatible endpoints.
+                SignatureVersion = "4"
             };
 
             ApplyProxy(config);
