@@ -377,4 +377,31 @@ namespace AwsConnectivityVerifier
             };
         }
     }
+
+
+    class Test
+    {
+        void Start(){
+                var verifier = new AwsConnectivityThroughProxyVerifier(
+                new AwsConnectivityThroughProxyVerifier.VerifierConfig
+                {
+                    Region = RegionEndpoint.EUCentral1,
+                    Credentials = new EnvironmentVariablesAWSCredentials(),
+                    S3BucketName = "your-bucket",
+                    ECSClusterHint = "your-cluster",
+
+                    Proxy = new AwsConnectivityThroughProxyVerifier.ProxyConfig
+                    {
+                        Host = "proxy.company.local",
+                        Port = 3128,
+                        Username = "user",
+                        Password = "pass"
+                    }
+                });
+
+            string json = await verifier.RunAsync();
+
+            Console.WriteLine(json);
+        }
+    }
 }
