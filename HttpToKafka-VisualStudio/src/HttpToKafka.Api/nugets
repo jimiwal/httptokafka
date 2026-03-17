@@ -1,0 +1,9 @@
+AWSSDK.S3
+
+Azure.Storage.Blobs
+
+Azure.Identity
+
+Microsoft.Extensions.Logging
+
+Microsoft.Extensions.Logging.Console
