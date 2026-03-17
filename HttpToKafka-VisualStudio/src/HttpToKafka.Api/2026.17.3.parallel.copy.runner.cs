@@ -1,28 +1,113 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Channels;
-using EcsToAzureBlobCopier.Abstractions;
+using Amazon.Runtime;
+using Amazon.S3;
+using Amazon.S3.Model;
+using Azure.Identity;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Microsoft.Extensions.Logging;
 
-namespace EcsToAzureBlobCopier.Parallel;
+namespace EcsToAzureBlobCopier.SingleFile;
+
+public sealed record EcsObjectDescriptor(
+    string Bucket,
+    string Key,
+    long Size,
+    DateTimeOffset LastModifiedUtc,
+    string? ETag
+);
+
+public interface IEcsObjectSource
+{
+    IAsyncEnumerable<EcsObjectDescriptor> ListAsync(
+        string bucket,
+        string? prefix,
+        DateTimeOffset? modifiedAfterUtc,
+        string? startAfterKey,
+        CancellationToken ct);
+
+    Task<Stream> OpenReadAsync(string bucket, string key, CancellationToken ct);
+}
+
+public interface IBlobObjectSink
+{
+    Task UploadAsync(
+        string container,
+        string blobName,
+        Stream content,
+        IDictionary<string, string>? metadata,
+        CancellationToken ct);
+}
+
+public sealed record CopyCheckpoint(
+    string Bucket,
+    string? Prefix,
+    string Container,
+    DateTimeOffset? ModifiedAfterUtc,
+    string? LastProcessedKey,
+    DateTimeOffset? LastProcessedLastModifiedUtc,
+    DateTimeOffset UpdatedUtc
+);
+
+public interface ICheckpointStore
+{
+    Task<CopyCheckpoint?> TryLoadAsync(string checkpointName, CancellationToken ct);
+    Task SaveAsync(string checkpointName, CopyCheckpoint checkpoint, CancellationToken ct);
+}
+
+public interface ICopyManifestWriter
+{
+    Task AppendSuccessAsync(string manifestName, EcsObjectDescriptor obj, string targetBlobName, CancellationToken ct);
+}
+
+public sealed class EcsS3Options
+{
+    public required Uri ServiceUrl { get; init; }
+    public required string AccessKeyId { get; init; }
+    public required string SecretAccessKey { get; init; }
+    public bool ForcePathStyle { get; init; } = true;
+    public string Region { get; init; } = "us-east-1";
+}
+
+public sealed class AzureBlobOptions
+{
+    public required Uri BlobServiceUri { get; init; }
+}
+
+public sealed class BlobCheckpointStoreOptions
+{
+    public required Uri BlobServiceUri { get; init; }
+    public required string Container { get; init; }
+}
+
+public sealed class BlobManifestWriterOptions
+{
+    public required Uri BlobServiceUri { get; init; }
+    public required string Container { get; init; }
+}
+
+public sealed class CopyRequest
+{
+    public required string SourceBucket { get; init; }
+    public string? SourcePrefix { get; init; }
+    public required string TargetContainer { get; init; }
+    public string? TargetPrefix { get; init; }
+    public DateTimeOffset? ModifiedAfterUtc { get; init; }
+    public required string CheckpointName { get; init; }
+    public required string ManifestName { get; init; }
+}
 
 public sealed class ParallelCopyOptions
 {
     public int MaxDegreeOfParallelism { get; init; } = 16;
-
-    // Maximum number of items in-flight (producer -> channel -> workers)
     public int BoundedCapacity { get; init; } = 512;
-
-    // How many committed items before checkpoint is saved (besides time-based trigger)
     public int CheckpointEveryCommits { get; init; } = 25;
-
-    // Minimum time between checkpoint saves
     public TimeSpan CheckpointMinInterval { get; init; } = TimeSpan.FromSeconds(5);
-
-    // Replay window: shifts effectiveAfter backward to catch late-arriving updates
     public TimeSpan ReplayWindow { get; init; } = TimeSpan.Zero;
-
-    // Minimum interval between progress logs
     public TimeSpan ProgressLogInterval { get; init; } = TimeSpan.FromMinutes(10);
 }
 
@@ -35,6 +120,157 @@ public sealed record ParallelCopyResult(
 );
 
 internal sealed record SequencedObject(long Seq, EcsObjectDescriptor Obj);
+
+public sealed class EcsS3ObjectSource : IEcsObjectSource, IDisposable
+{
+    private readonly IAmazonS3 _s3;
+
+    public EcsS3ObjectSource(EcsS3Options opt)
+    {
+        var creds = new BasicAWSCredentials(opt.AccessKeyId, opt.SecretAccessKey);
+        var cfg = new AmazonS3Config
+        {
+            ServiceURL = opt.ServiceUrl.ToString(),
+            ForcePathStyle = opt.ForcePathStyle,
+            AuthenticationRegion = opt.Region,
+            SignatureVersion = "4"
+        };
+        _s3 = new AmazonS3Client(creds, cfg);
+    }
+
+    public async IAsyncEnumerable<EcsObjectDescriptor> ListAsync(
+        string bucket,
+        string? prefix,
+        DateTimeOffset? modifiedAfterUtc,
+        string? startAfterKey,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        string? continuation = null;
+
+        do
+        {
+            var req = new ListObjectsV2Request
+            {
+                BucketName = bucket,
+                Prefix = prefix,
+                ContinuationToken = continuation,
+                StartAfter = startAfterKey
+            };
+
+            var resp = await _s3.ListObjectsV2Async(req, ct).ConfigureAwait(false);
+
+            foreach (var o in resp.S3Objects.OrderBy(x => x.Key, StringComparer.Ordinal))
+            {
+                var lm = new DateTimeOffset(o.LastModified, TimeSpan.Zero);
+                if (modifiedAfterUtc is not null && lm <= modifiedAfterUtc.Value)
+                    continue;
+
+                yield return new EcsObjectDescriptor(bucket, o.Key, o.Size, lm, o.ETag);
+            }
+
+            continuation = resp.IsTruncated ? resp.NextContinuationToken : null;
+            startAfterKey = null;
+        }
+        while (continuation is not null);
+    }
+
+    public async Task<Stream> OpenReadAsync(string bucket, string key, CancellationToken ct)
+    {
+        var resp = await _s3.GetObjectAsync(bucket, key, ct).ConfigureAwait(false);
+        return resp.ResponseStream;
+    }
+
+    public void Dispose() => _s3.Dispose();
+}
+
+public sealed class AzureBlobObjectSink : IBlobObjectSink
+{
+    private readonly BlobServiceClient _svc;
+
+    public AzureBlobObjectSink(AzureBlobOptions opt)
+    {
+        _svc = new BlobServiceClient(opt.BlobServiceUri, new DefaultAzureCredential());
+    }
+
+    public async Task UploadAsync(
+        string container,
+        string blobName,
+        Stream content,
+        IDictionary<string, string>? metadata,
+        CancellationToken ct)
+    {
+        var containerClient = _svc.GetBlobContainerClient(container);
+        await containerClient.CreateIfNotExistsAsync(cancellationToken: ct).ConfigureAwait(false);
+
+        var blob = containerClient.GetBlobClient(blobName);
+        var opts = new BlobUploadOptions
+        {
+            Metadata = metadata is null ? null : new Dictionary<string, string>(metadata)
+        };
+
+        await blob.UploadAsync(content, opts, ct).ConfigureAwait(false);
+    }
+}
+
+public sealed class BlobCheckpointStore : ICheckpointStore
+{
+    private readonly BlobContainerClient _container;
+    private static readonly JsonSerializerOptions JsonOpt = new(JsonSerializerDefaults.Web);
+
+    public BlobCheckpointStore(BlobCheckpointStoreOptions opt)
+    {
+        var svc = new BlobServiceClient(opt.BlobServiceUri, new DefaultAzureCredential());
+        _container = svc.GetBlobContainerClient(opt.Container);
+    }
+
+    public async Task<CopyCheckpoint?> TryLoadAsync(string checkpointName, CancellationToken ct)
+    {
+        await _container.CreateIfNotExistsAsync(cancellationToken: ct).ConfigureAwait(false);
+        var blob = _container.GetBlobClient(checkpointName);
+
+        try
+        {
+            var dl = await blob.DownloadContentAsync(ct).ConfigureAwait(false);
+            return JsonSerializer.Deserialize<CopyCheckpoint>(dl.Value.Content.ToString(), JsonOpt);
+        }
+        catch (Azure.RequestFailedException ex) when (ex.Status == 404)
+        {
+            return null;
+        }
+    }
+
+    public async Task SaveAsync(string checkpointName, CopyCheckpoint checkpoint, CancellationToken ct)
+    {
+        await _container.CreateIfNotExistsAsync(cancellationToken: ct).ConfigureAwait(false);
+        var blob = _container.GetBlobClient(checkpointName);
+        var json = JsonSerializer.Serialize(checkpoint, JsonOpt);
+        using var ms = new MemoryStream(Encoding.UTF8.GetBytes(json));
+        await blob.UploadAsync(ms, overwrite: true, cancellationToken: ct).ConfigureAwait(false);
+    }
+}
+
+public sealed class BlobAppendManifestWriter : ICopyManifestWriter
+{
+    private readonly BlobContainerClient _container;
+
+    public BlobAppendManifestWriter(BlobManifestWriterOptions opt)
+    {
+        var svc = new BlobServiceClient(opt.BlobServiceUri, new DefaultAzureCredential());
+        _container = svc.GetBlobContainerClient(opt.Container);
+    }
+
+    public async Task AppendSuccessAsync(string manifestName, EcsObjectDescriptor obj, string targetBlobName, CancellationToken ct)
+    {
+        await _container.CreateIfNotExistsAsync(cancellationToken: ct).ConfigureAwait(false);
+        var append = _container.GetAppendBlobClient(manifestName);
+        if (!await append.ExistsAsync(ct).ConfigureAwait(false))
+            await append.CreateAsync(cancellationToken: ct).ConfigureAwait(false);
+
+        var line = $"{DateTimeOffset.UtcNow:O}	{obj.Bucket}	{obj.Key}	{obj.LastModifiedUtc:O}	{obj.Size}	{targetBlobName}\n";
+        using var ms = new MemoryStream(Encoding.UTF8.GetBytes(line));
+        await append.AppendBlockAsync(ms, cancellationToken: ct).ConfigureAwait(false);
+    }
+}
 
 public sealed class ParallelCopyRunner
 {
@@ -64,18 +300,13 @@ public sealed class ParallelCopyRunner
         _log = log;
     }
 
-    public async Task<ParallelCopyResult> RunAsync(
-        CopyRequest req,
-        ParallelCopyOptions opt,
-        CancellationToken ct)
+    public async Task<ParallelCopyResult> RunAsync(CopyRequest req, ParallelCopyOptions opt, CancellationToken ct)
     {
-        // Reset per-run progress counters
         _lastProgressLogUtc = DateTimeOffset.MinValue;
         Interlocked.Exchange(ref _progressCounter, 0);
         Interlocked.Exchange(ref _totalBytes, 0);
         _globalSw = Stopwatch.StartNew();
 
-        // 1) Load checkpoint (watermark)
         var cp = await _checkpointStore.TryLoadAsync(req.CheckpointName, ct).ConfigureAwait(false);
 
         if (cp is not null)
@@ -89,16 +320,8 @@ public sealed class ParallelCopyRunner
             }
         }
 
-        // 2) Compute effective watermark
-        //    - start from checkpoint if it exists
-        //    - otherwise use req.ModifiedAfterUtc
-        //    - replay window shifts effectiveAfter backward when configured
         var baseAfter = cp?.LastProcessedLastModifiedUtc ?? req.ModifiedAfterUtc;
-        var effectiveAfter = baseAfter is null
-            ? (DateTimeOffset?)null
-            : baseAfter.Value - opt.ReplayWindow;
-
-        // Tie-breaker key is only relevant when resuming from a checkpoint
+        var effectiveAfter = baseAfter is null ? (DateTimeOffset?)null : baseAfter.Value - opt.ReplayWindow;
         var watermarkKey = cp?.LastProcessedKey;
         var watermarkLm = cp?.LastProcessedLastModifiedUtc;
 
@@ -107,7 +330,6 @@ public sealed class ParallelCopyRunner
             req.SourceBucket, req.SourcePrefix, req.TargetContainer, opt.MaxDegreeOfParallelism, opt.BoundedCapacity,
             effectiveAfter, watermarkLm, watermarkKey, opt.ReplayWindow, opt.ProgressLogInterval);
 
-        // 3) Create channel
         var channel = Channel.CreateBounded<SequencedObject>(new BoundedChannelOptions(opt.BoundedCapacity)
         {
             FullMode = BoundedChannelFullMode.Wait,
@@ -119,19 +341,18 @@ public sealed class ParallelCopyRunner
         var token = linkedCts.Token;
 
         var committer = new OrderedCheckpointCommitter(
-            checkpointName: req.CheckpointName,
-            baseCheckpoint: cp,
-            checkpointStore: _checkpointStore,
-            req: req,
-            log: _log,
-            everyCommits: opt.CheckpointEveryCommits,
-            minInterval: opt.CheckpointMinInterval);
+            req.CheckpointName,
+            cp,
+            _checkpointStore,
+            req,
+            _log,
+            opt.CheckpointEveryCommits,
+            opt.CheckpointMinInterval);
 
         int copied = 0;
         int failed = 0;
         int processed = 0;
 
-        // 4) Producer
         var producer = Task.Run(async () =>
         {
             try
@@ -139,16 +360,14 @@ public sealed class ParallelCopyRunner
                 long seq = 0;
 
                 await foreach (var obj in _source.ListAsync(
-                    bucket: req.SourceBucket,
-                    prefix: req.SourcePrefix,
-                    modifiedAfterUtc: effectiveAfter,
-                    startAfterKey: null,
-                    ct: token).ConfigureAwait(false))
+                    req.SourceBucket,
+                    req.SourcePrefix,
+                    effectiveAfter,
+                    null,
+                    token).ConfigureAwait(false))
                 {
                     token.ThrowIfCancellationRequested();
 
-                    // Additional filter for watermark tie-break (same LastModified timestamp)
-                    // If obj.LastModifiedUtc == watermarkLm, only keys > watermarkKey should be processed
                     if (watermarkLm is not null && watermarkKey is not null &&
                         obj.LastModifiedUtc == watermarkLm.Value &&
                         string.CompareOrdinal(obj.Key, watermarkKey) <= 0)
@@ -156,7 +375,6 @@ public sealed class ParallelCopyRunner
                         continue;
                     }
 
-                    // Listing is already filtered by effectiveAfter, so no extra filter is usually needed here
                     await channel.Writer.WriteAsync(new SequencedObject(seq++, obj), token).ConfigureAwait(false);
                 }
 
@@ -169,7 +387,6 @@ public sealed class ParallelCopyRunner
             }
         }, token);
 
-        // 5) Workers
         var workers = Enumerable.Range(0, opt.MaxDegreeOfParallelism)
             .Select(i => Task.Run(async () =>
             {
@@ -179,7 +396,6 @@ public sealed class ParallelCopyRunner
                     {
                         token.ThrowIfCancellationRequested();
                         var obj = item.Obj;
-
                         var blobName = BuildTargetBlobName(req.TargetPrefix, obj.Key);
 
                         try
@@ -196,9 +412,7 @@ public sealed class ParallelCopyRunner
                             if (!string.IsNullOrWhiteSpace(obj.ETag))
                                 metadata["sourceETag"] = obj.ETag!;
 
-                            // Mode A: always overwrite (sink implementation must support that behavior)
                             await _sink.UploadAsync(req.TargetContainer, blobName, stream, metadata, token).ConfigureAwait(false);
-
                             await _manifest.AppendSuccessAsync(req.ManifestName, obj, blobName, token).ConfigureAwait(false);
 
                             var currentIndex = Interlocked.Increment(ref _progressCounter);
@@ -208,7 +422,6 @@ public sealed class ParallelCopyRunner
                             Interlocked.Increment(ref processed);
 
                             MaybeLogProgress(opt.ProgressLogInterval, currentIndex, copied, failed, processed, obj, blobName, i);
-
                             await committer.MarkDoneAsync(item.Seq, obj, token).ConfigureAwait(false);
                         }
                         catch (Exception ex)
@@ -217,8 +430,6 @@ public sealed class ParallelCopyRunner
                             Interlocked.Increment(ref processed);
 
                             _log.LogError(ex, "Copy failed for {Key} (seq={Seq}). Cancelling run.", obj.Key, item.Seq);
-
-                            // Fail-fast: cancel entire run to avoid gaps and uncertain watermark state
                             linkedCts.Cancel();
                             throw;
                         }
@@ -226,12 +437,10 @@ public sealed class ParallelCopyRunner
                 }
                 catch (OperationCanceledException) when (token.IsCancellationRequested)
                 {
-                    // Expected during fail-fast cancellation
                 }
             }, token))
             .ToArray();
 
-        // 6) Join + final checkpoint flush
         try
         {
             await Task.WhenAll(workers.Append(producer)).ConfigureAwait(false);
@@ -243,8 +452,7 @@ public sealed class ParallelCopyRunner
         }
         catch
         {
-            // If something fails, try to persist the last fully committed watermark
-            try { await committer.FlushAsync(CancellationToken.None).ConfigureAwait(false); } catch { /* best effort */ }
+            try { await committer.FlushAsync(CancellationToken.None).ConfigureAwait(false); } catch { }
             throw;
         }
 
@@ -256,12 +464,7 @@ public sealed class ParallelCopyRunner
             "Parallel copy finished. Copied={Copied}, Failed={Failed}, Processed={Processed}, Watermark=({WmLm},{WmKey})",
             copied, failed, processed, finalWm.LastModifiedUtc, finalWm.Key);
 
-        return new ParallelCopyResult(
-            CopiedCount: copied,
-            FailedCount: failed,
-            TotalProcessed: processed,
-            WatermarkKey: finalWm.Key,
-            WatermarkLastModifiedUtc: finalWm.LastModifiedUtc);
+        return new ParallelCopyResult(copied, failed, processed, finalWm.Key, finalWm.LastModifiedUtc);
     }
 
     private void MaybeLogProgress(
@@ -285,8 +488,7 @@ public sealed class ParallelCopyRunner
             }
         }
 
-        if (!shouldLog)
-            return;
+        if (!shouldLog) return;
 
         var elapsed = _globalSw.Elapsed.TotalSeconds;
         var objectsPerSecond = currentIndex / Math.Max(1d, elapsed);
@@ -294,15 +496,7 @@ public sealed class ParallelCopyRunner
 
         _log.LogInformation(
             "[Progress] Index={Index}, Copied={Copied}, Failed={Failed}, Processed={Processed}, ObjectsPerSecond={ObjectsPerSecond:F2}, MBPerSecond={MBPerSecond:F2}, CurrentKey={Key}, TargetBlob={Blob}, Worker={Worker}",
-            currentIndex,
-            copied,
-            failed,
-            processed,
-            objectsPerSecond,
-            mbPerSecond,
-            obj.Key,
-            blobName,
-            workerId);
+            currentIndex, copied, failed, processed, objectsPerSecond, mbPerSecond, obj.Key, blobName, workerId);
     }
 
     private static string BuildTargetBlobName(string? targetPrefix, string sourceKey)
@@ -319,15 +513,11 @@ public sealed class ParallelCopyRunner
         private readonly ICheckpointStore _store;
         private readonly CopyRequest _req;
         private readonly ILogger _log;
-
         private readonly int _everyCommits;
         private readonly TimeSpan _minInterval;
-
         private readonly object _lock = new();
-
         private long _nextToCommit;
         private readonly SortedDictionary<long, EcsObjectDescriptor> _done = new();
-
         private int _commitCountSinceSave;
         private DateTimeOffset _lastSaveUtc = DateTimeOffset.MinValue;
 
@@ -348,7 +538,6 @@ public sealed class ParallelCopyRunner
             _log = log;
             _everyCommits = Math.Max(1, everyCommits);
             _minInterval = minInterval;
-
             _nextToCommit = 0;
             CurrentWatermark = (baseCheckpoint?.LastProcessedLastModifiedUtc, baseCheckpoint?.LastProcessedKey);
         }
@@ -359,20 +548,15 @@ public sealed class ParallelCopyRunner
 
             lock (_lock)
             {
-                // Store successful item in completion map
                 _done[seq] = obj;
 
-                // Commit continuous prefix (ordered completion)
                 while (_done.TryGetValue(_nextToCommit, out var nextObj))
                 {
                     _done.Remove(_nextToCommit);
                     _nextToCommit++;
-
-                    // Watermark moves to the last fully committed object
                     CurrentWatermark = (nextObj.LastModifiedUtc, nextObj.Key);
                     _commitCountSinceSave++;
 
-                    // Prepare checkpoint save when threshold is reached
                     if (ShouldSaveNow())
                     {
                         checkpointToSave = BuildCheckpoint(CurrentWatermark);
@@ -407,7 +591,7 @@ public sealed class ParallelCopyRunner
         }
 
         private CopyCheckpoint BuildCheckpoint((DateTimeOffset? LastModifiedUtc, string? Key) wm)
-            => new CopyCheckpoint(
+            => new(
                 Bucket: _req.SourceBucket,
                 Prefix: _req.SourcePrefix,
                 Container: _req.TargetContainer,
@@ -420,8 +604,90 @@ public sealed class ParallelCopyRunner
         private async Task SaveAsync(CopyCheckpoint cp, CancellationToken ct)
         {
             await _store.SaveAsync(_checkpointName, cp, ct).ConfigureAwait(false);
-            _log.LogInformation("Checkpoint saved. Watermark=({WmLm},{WmKey}) UpdatedUtc={Updated}",
+            _log.LogInformation(
+                "Checkpoint saved. Watermark=({WmLm},{WmKey}) UpdatedUtc={Updated}",
                 cp.LastProcessedLastModifiedUtc, cp.LastProcessedKey, cp.UpdatedUtc);
         }
+    }
+}
+
+public static class Program
+{
+    public static async Task Main(string[] args)
+    {
+        var ecsOptions = new EcsS3Options
+        {
+            ServiceUrl = new Uri("https://ecs.example.com"),
+            AccessKeyId = "ECS_ACCESS_KEY",
+            SecretAccessKey = "ECS_SECRET_KEY",
+            ForcePathStyle = true,
+            Region = "us-east-1"
+        };
+
+        var azureBlobServiceUri = new Uri("https://youraccount.blob.core.windows.net/");
+
+        using var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder.AddSimpleConsole(o =>
+            {
+                o.SingleLine = true;
+                o.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
+            });
+            builder.SetMinimumLevel(LogLevel.Information);
+        });
+
+        var source = new EcsS3ObjectSource(ecsOptions);
+        var sink = new AzureBlobObjectSink(new AzureBlobOptions
+        {
+            BlobServiceUri = azureBlobServiceUri
+        });
+        var checkpointStore = new BlobCheckpointStore(new BlobCheckpointStoreOptions
+        {
+            BlobServiceUri = azureBlobServiceUri,
+            Container = "ecs-copy-state"
+        });
+        var manifestWriter = new BlobAppendManifestWriter(new BlobManifestWriterOptions
+        {
+            BlobServiceUri = azureBlobServiceUri,
+            Container = "ecs-copy-manifest"
+        });
+
+        var runner = new ParallelCopyRunner(
+            source,
+            sink,
+            checkpointStore,
+            manifestWriter,
+            loggerFactory.CreateLogger<ParallelCopyRunner>());
+
+        var request = new CopyRequest
+        {
+            SourceBucket = "my-bucket",
+            SourcePrefix = "data/",
+            TargetContainer = "backup",
+            TargetPrefix = "ecs/",
+            ModifiedAfterUtc = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            CheckpointName = "myjob.json",
+            ManifestName = "myjob-success.log"
+        };
+
+        var options = new ParallelCopyOptions
+        {
+            MaxDegreeOfParallelism = 16,
+            BoundedCapacity = 512,
+            CheckpointEveryCommits = 25,
+            CheckpointMinInterval = TimeSpan.FromSeconds(5),
+            ReplayWindow = TimeSpan.Zero,
+            ProgressLogInterval = TimeSpan.FromMinutes(10)
+        };
+
+        var result = await runner.RunAsync(request, options, CancellationToken.None);
+
+        Console.WriteLine();
+        Console.WriteLine("===== FINAL RESULT =====");
+        Console.WriteLine($"CopiedCount              : {result.CopiedCount}");
+        Console.WriteLine($"FailedCount              : {result.FailedCount}");
+        Console.WriteLine($"TotalProcessed           : {result.TotalProcessed}");
+        Console.WriteLine($"WatermarkKey             : {result.WatermarkKey}");
+        Console.WriteLine($"WatermarkLastModifiedUtc : {result.WatermarkLastModifiedUtc:O}");
     }
 }
