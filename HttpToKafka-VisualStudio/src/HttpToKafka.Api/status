@@ -1,0 +1,219 @@
+1. Initial Implementation
+
+We started with a basic C# library designed to copy data from ECS (Elastic Cloud Storage) to Azure Blob Storage.
+
+Key assumptions:
+
+read objects from ECS via S3-compatible API,
+stream data directly to Azure Blob Storage,
+use Microsoft ILogger for logging (Splunk integration),
+support resumability,
+track successfully copied objects.
+
+The architecture was separated into clear responsibilities:
+
+source (ECS),
+destination (Azure Blob),
+checkpoint store,
+success manifest,
+orchestration layer.
+2. Introducing Parallel Copy
+
+To improve performance for large datasets, we implemented parallel processing.
+
+Key elements:
+
+Channel for producer-consumer pattern,
+multiple workers copying objects concurrently,
+configurable MaxDegreeOfParallelism,
+BoundedCapacity to control memory pressure.
+
+This enabled efficient scaling while keeping the system stable.
+
+3. First Checkpoint & Resume Mechanism
+
+Initially, resume logic was based on:
+
+LastProcessedKey
+LastProcessedLastModifiedUtc
+
+and included filtering by LastModified.
+
+At first glance this seemed correct, but later proved problematic.
+
+4. Critical Issue with Resume by LastModified
+
+We identified a major flaw:
+
+If:
+
+migration stops midway,
+checkpoint stores a recent timestamp,
+remaining objects have older LastModified values,
+
+then after restart:
+👉 those objects would be permanently skipped
+
+Conclusion:
+
+LastModified filtering is suitable for incremental sync
+but NOT for full migration resume
+5. Fix: Resume Based on Object Key
+
+We redesigned resume logic:
+
+resume now uses LastProcessedKey,
+ECS listing uses StartAfter = LastProcessedKey,
+all objects after that key are processed,
+no date filtering during resume.
+
+ModifiedAfterUtc remains optional and applies only to the initial run.
+
+6. Integration with Quokka (F# ↔ C#)
+
+The migration is triggered via Quokka, owned by Billy, which exposes an HTTP endpoint.
+
+Challenges:
+
+Quokka is written in F#
+migration library is in C#
+
+Actions taken:
+
+analyzed and fixed compilation issues,
+ensured interoperability,
+provided a working F# entry point (Program.fs) demonstrating correct usage.
+7. Compatibility Issue with required
+
+We encountered issues with the required keyword not being supported in the current environment.
+
+Solution:
+
+removed required,
+adjusted models to work with older C# versions.
+8. Azure Storage Emulator Issue
+
+During local testing:
+
+DownloadContentAsync failed due to unsupported REST version in emulator.
+
+Solution:
+
+switched to DownloadStreamingAsync,
+ensured compatibility with older emulator versions.
+9. ECS Stream Lifecycle Issue
+
+Originally, we returned:
+
+resp.ResponseStream
+
+Problem:
+
+GetObjectResponse was not disposed,
+potential HTTP connection leaks under parallel load.
+
+Solution:
+
+introduced S3ResponseStream,
+ensured proper disposal of the entire response lifecycle.
+10. Azure Upload Idempotency
+
+We identified a risk with blob overwrites during retries/resume.
+
+Solution:
+
+ensured uploads are safe and idempotent,
+handled overwrite scenarios explicitly.
+11. Concurrent Manifest Writes
+
+Multiple workers writing to an append blob introduced race conditions.
+
+Solution:
+
+added synchronization around manifest writes,
+ensured safe sequential appends.
+12. Fixing Progress Counters & Logging
+
+Initial counters (copied, failed, processed) were not thread-safe.
+
+Solution:
+
+replaced with atomic operations (Interlocked),
+improved logging to include:
+object index,
+throughput (objects/sec, MB/sec),
+current key,
+worker ID.
+
+Additionally:
+
+reduced logging frequency to once every 10 minutes to avoid flooding Splunk.
+13. ECS Stream Failures (Premature End)
+
+During testing, we observed errors like:
+
+The response ended prematurely, with X additional bytes expected
+
+Meaning:
+
+ECS declared a content length,
+but terminated the stream early.
+
+This is typically caused by:
+
+ECS instability,
+network interruptions,
+high parallel load.
+14. Adding Retry Mechanism
+
+To handle transient failures:
+
+implemented configurable retry (MaxReadRetries),
+each retry opens a new stream,
+added delay between retries.
+
+This significantly improved resilience.
+
+15. Changing Failure Strategy (Fail-Safe Instead of Fail-Fast)
+
+Originally:
+
+a single failure would stop the entire migration.
+
+Updated behavior:
+
+migration continues even if an object fails,
+failures are isolated per object.
+16. Introducing BlackList.json
+
+New feature:
+
+If an object fails after all retries:
+
+it is written to BlackList.json,
+includes:
+bucket,
+key,
+size,
+last modified,
+ETag,
+full error details,
+timestamp.
+
+This allows:
+
+uninterrupted migration,
+later analysis or reprocessing.
+17. Final Packaging & F# Entry Point
+
+We prepared:
+
+a single-file C# version (easy integration),
+an F# entry point (Program.fs).
+
+In F#:
+
+all parameters are configurable via variables,
+ModifiedAfter supports:
+empty string → null,
+"2026-01-01" → parsed date.
