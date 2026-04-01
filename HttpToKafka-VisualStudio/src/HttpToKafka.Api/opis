@@ -1,0 +1,20 @@
+The goal of this task is to migrate data used by the Mokka application from ECS (Elastic Cloud Storage) to Azure Blob Storage.
+
+The scope includes designing and implementing a migration process that enables secure, efficient, and repeatable transfer of large volumes of data between the two environments.
+
+The migration solution should:
+
+ensure complete transfer of data (objects/binary files) from ECS to Azure Blob Storage,
+handle large datasets and varying object sizes,
+support resuming the process after interruptions (checkpoint mechanism),
+enable parallel processing to optimize migration performance,
+be resilient to network issues and read failures (retry mechanism and blacklist for problematic objects),
+provide logging of progress and errors (integrated with existing logging system, e.g., Splunk).
+
+Additionally, the solution should allow:
+
+configuration of key parameters (e.g., parallelism level, retry settings, data scope),
+optional filtering of objects based on modification date,
+auditability of the migration process (list of successfully copied objects and failed ones).
+
+The final outcome is a fully functional migration mechanism that can be triggered from an application layer (e.g., via an HTTP endpoint exposed by the Quokka system) and used to transfer production data to Azure Blob Storage.
