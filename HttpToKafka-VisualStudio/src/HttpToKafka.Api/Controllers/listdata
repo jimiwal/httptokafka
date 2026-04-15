@@ -1,0 +1,28 @@
+let ecsOptions =
+    EcsS3Options(
+        ServiceUrl = Uri(serviceUrl),
+        AccessKeyId = accessKey,
+        SecretAccessKey = secretKey,
+        ForcePathStyle = true,
+        Region = region
+    )
+
+use source = new EcsS3ObjectSource(ecsOptions)
+
+let ct = CancellationToken.None
+
+let run = task {
+    let e = source.ListAsync(bucketName, prefix, null, null, ct)
+
+    let mutable enumerator = e.GetAsyncEnumerator(ct)
+
+    try
+        while (let! hasNext = enumerator.MoveNextAsync()
+               hasNext) do
+            let obj = enumerator.Current
+            printfn "Key: %s | Size: %d" obj.Key obj.Size
+    finally
+        do! enumerator.DisposeAsync()
+}
+
+run.GetAwaiter().GetResult()
