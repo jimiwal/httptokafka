@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Amazon.Runtime;
@@ -29,13 +27,14 @@ public static class EcsVersionCleanup
         return new AmazonS3Client(credentials, config);
     }
 
-    public static async Task DeleteAllObjectVersionsAsync(
+    public static async Task DeleteAllObjectVersionsOneByOneAsync(
         IAmazonS3 s3,
         string bucket,
         CancellationToken ct)
     {
         string keyMarker = null;
         string versionIdMarker = null;
+        long deletedCount = 0;
 
         do
         {
@@ -46,59 +45,32 @@ public static class EcsVersionCleanup
                 VersionIdMarker = versionIdMarker
             };
 
-            var response = await s3.ListVersionsAsync(listRequest, ct);
-
-            var toDelete = new List<KeyVersion>();
+            var response = await s3.ListVersionsAsync(listRequest, ct).ConfigureAwait(false);
 
             foreach (var version in response.Versions)
             {
-                toDelete.Add(new KeyVersion
-                {
-                    Key = version.Key,
-                    VersionId = version.VersionId
-                });
-            }
+                ct.ThrowIfCancellationRequested();
 
-            foreach (var batch in Batch(toDelete, 1000))
-            {
-                var deleteRequest = new DeleteObjectsRequest
+                var deleteRequest = new DeleteObjectRequest
                 {
                     BucketName = bucket,
-                    Objects = batch.ToList()
+                    Key = version.Key,
+                    VersionId = version.VersionId
                 };
 
-                var deleteResponse = await s3.DeleteObjectsAsync(deleteRequest, ct);
-                Console.WriteLine($"Deleted {deleteResponse.DeletedObjects.Count} object versions");
+                await s3.DeleteObjectAsync(deleteRequest, ct).ConfigureAwait(false);
+
+                deletedCount++;
+                Console.WriteLine(
+                    $"Deleted version #{deletedCount}: Key='{version.Key}', VersionId='{version.VersionId}'");
             }
 
             keyMarker = response.IsTruncated == true ? response.NextKeyMarker : null;
             versionIdMarker = response.IsTruncated == true ? response.NextVersionIdMarker : null;
 
-        } while (responseHasMore(keyMarker, versionIdMarker));
-    }
+        } while (!string.IsNullOrWhiteSpace(keyMarker) || !string.IsNullOrWhiteSpace(versionIdMarker));
 
-    private static bool responseHasMore(string keyMarker, string versionIdMarker)
-    {
-        return !string.IsNullOrWhiteSpace(keyMarker) || !string.IsNullOrWhiteSpace(versionIdMarker);
-    }
-
-    private static IEnumerable<List<T>> Batch<T>(IEnumerable<T> source, int size)
-    {
-        var batch = new List<T>(size);
-
-        foreach (var item in source)
-        {
-            batch.Add(item);
-
-            if (batch.Count == size)
-            {
-                yield return batch;
-                batch = new List<T>(size);
-            }
-        }
-
-        if (batch.Count > 0)
-            yield return batch;
+        Console.WriteLine($"Finished. Total deleted versions: {deletedCount}");
     }
 
     public static async Task Main()
@@ -107,8 +79,11 @@ public static class EcsVersionCleanup
 
         using var s3 = CreateS3Client();
 
-        await DeleteAllObjectVersionsAsync(s3, bucketName, CancellationToken.None);
+        await DeleteAllObjectVersionsOneByOneAsync(
+            s3,
+            bucketName,
+            CancellationToken.None);
 
-        Console.WriteLine("Finished deleting all object versions.");
+        Console.WriteLine("Done.");
     }
 }
