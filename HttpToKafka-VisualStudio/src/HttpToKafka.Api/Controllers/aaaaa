@@ -1,0 +1,29 @@
+Summary
+Mark the target production bucket for platform-led cleanup of legacy object versions and delete markers, followed by erasure and decommission activities.
+
+Change Description
+This RFC requests platform/storage team action to mark the target bucket for cleanup and decommission. The requester cannot permanently remove historical object versions and delete markers due to permission and platform limitations, therefore the activity must be executed by the responsible infrastructure team.
+
+Implementation Plan
+
+Validate the target bucket identified for retirement and confirm it is no longer required for active processing.
+Platform/storage team marks the bucket for cleanup and subsequent erasure/decommission workflow.
+Responsible team removes legacy object versions, delete markers, and residual bucket content using privileged administrative access.
+Confirm the bucket is empty and no recoverable object versions remain.
+Proceed with standard decommission steps in line with platform procedures and retention requirements.
+Communicate completion to stakeholders and update the RFC with final status.
+
+Test Evidence
+Validation performed in non-production/administrative review confirmed that standard requester access is insufficient to delete historical object versions and delete markers. Cleanup requires elevated platform-level permissions. Evidence can be provided through bucket version listing results and failed deletion attempts showing residual versioned content remains inaccessible to the requester.
+
+Backout Plan
+If the change cannot be completed or an issue is identified during execution, stop the decommission activity and leave the bucket in its current state. No application code or configuration changes are being introduced by this RFC. The bucket remains available for further investigation and a revised cleanup plan can be scheduled once platform team review is completed.
+
+Implementation Verification Plan
+Verify that the bucket no longer contains active objects, historical object versions, or delete markers. Confirm with the platform/storage team that cleanup was completed successfully and that the bucket is ready for erasure/decommission. Record the verification outcome in the RFC and notify impacted stakeholders.
+
+Application Support Sign Off Required / Downtime Required
+No downtime required.
+Application support sign-off: confirm according to internal process.
+
+Jeśli chcesz, mogę Ci też od razu zrobić krótszą, bardziej “korporacyjną” wersję, żeby brzmiała bardziej jak standardowy UBS change.
