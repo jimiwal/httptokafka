@@ -1,0 +1,15 @@
+Hi a,
+
+I have a question regarding the ECS cluster decommissioning process across regions.
+
+Could you clarify what happens with the data stored in ECS buckets when a cluster is being decommissioned?
+
+Specifically:
+
+Are the data archived in any way before shutdown?
+Are the buckets/data automatically deleted by the platform?
+Or are we expected to clean up (empty) the buckets beforehand?
+
+I want to make sure we align properly and don’t risk losing any data during the decommissioning process.
+
+Thanks!
