@@ -13,3 +13,16 @@ Or are we expected to clean up (empty) the buckets beforehand?
 I want to make sure we align properly and don’t risk losing any data during the decommissioning process.
 
 Thanks!
+
+
+
+
+Hi essss,
+
+I’d like to confirm one thing regarding the eeee nnnn yyy decommissioning.
+
+After the decommission is completed, can we safely remove all data from the associated EEEEEE buckets (both UAT and PROD)?
+
+I just want to make sure there are no dependencies or retention requirements before proceeding with the cleanup.
+
+Thanks!
